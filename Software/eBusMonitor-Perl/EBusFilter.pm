@@ -46,7 +46,21 @@ sub get_one_start {
 		}
 	}
 	else {
-		$buffer .= $raw;
+		if ($byte == 0xA9) {
+			$self->{a9} = 1;
+		}
+		elsif ($byte == 0x01 && $self->{a9}) {
+			$self->{a9} = 0;
+			$raw = chr(0xAA);
+			$buffer .= $raw;
+		} 
+		elsif ($byte != 0x01 && $self->{a9}) {
+			$self->{a9} = 0;
+			$raw = chr(0xA9).$raw;
+		}
+		else {
+		  $buffer .= $raw;
+		}
 	}
 }
 
@@ -77,7 +91,7 @@ sub get_one {
 		$dgram->{CHK} =
 		  asciiConv( substr( $self->{transfer}, 5 + $dgram->{NN}, 1 ) );
 		my $check =
-		  $crc->calcCrc( substr( $self->{transfer}, 0, 5 + $dgram->{NN} ) );
+		  $crc->calcCrcExpanded( substr( $self->{transfer}, 0, 5 + $dgram->{NN} ) );
 		if ( $check != $dgram->{CHK} ) {
 			$dgram->{CHKSUMFALSE} = 1;
 		}
@@ -102,7 +116,7 @@ sub get_one {
 					$self->{transfer}, 8 + $dgram->{SNN} + $dgram->{NN}, 1
 				)
 			);
-			my $checkS = $crc->calcCrc(
+			my $checkS = $crc->calcCrcExpanded(
 				substr( $self->{transfer}, 7 + $dgram->{NN}, $dgram->{SNN} + 1 ) );
 			if ( $checkS != $dgram->{SCHK} ) {
 				$dgram->{SCHKSUMFALSE} = 1;

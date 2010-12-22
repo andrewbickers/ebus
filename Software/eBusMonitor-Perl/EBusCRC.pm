@@ -59,4 +59,24 @@ sub calcCrc {
   return $crc;
 }
 
+sub calcCrcExpanded {
+  my ($self, $str) = @_;
+  my $tmp = "";
+  for (my $i = 0; $i < length($str); $i++ ) {
+  	my $chr = substr($str, $i, 1);
+  	if (ord($chr) == 170 ) {
+  		$tmp .= chr(0xA9).chr(0x01);
+  	}
+  	else {
+  		$tmp .= $chr;
+  	}
+  }
+  my $len = length($tmp);
+  my $crc = 0;
+  for (my $i = 0; $i < $len; $i++) {
+    $crc = crc8(substr($tmp, $i, 1), $crc);
+  }
+  return $crc;
+}
+
 1;
