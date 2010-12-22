@@ -5,6 +5,15 @@ use POE;
 use EBusFilter;
 use POE::Component::Client::TCP;
 
+my %names;
+$names{0x3}  = "Feuerungsautomat";
+$names{0xfe} = "Broadcast";
+$names{0x10} = "Heizungsregler";
+$names{0x30} = "Bedienmodul";
+$names{0x51} = "Bedienmodul";
+$names{0x70} = "Bedienmodul";
+$names{0xF1} = "Heizungsregler";
+
 POE::Session->create(
 	inline_states => {
 		_start    => sub { },
@@ -55,7 +64,7 @@ sub dataIn {
 		}
 		print " SCHK:" . $data->{SCHK};
 	}
-	print " (!)"if ($data->{CHKSUMFALSE});
-	print " (!!)"if ($data->{SCHKSUMFALSE}); 
+	print " (!)"  if ( $data->{CHKSUMFALSE} );
+	print " (!!)" if ( $data->{SCHKSUMFALSE} );
 	print "\n";
 }
