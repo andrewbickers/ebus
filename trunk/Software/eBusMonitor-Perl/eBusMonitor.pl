@@ -1,49 +1,61 @@
-#!/usr/bin/perl 
+#!/usr/bin/perl
 use strict;
 use warnings;
 use POE;
-use Device::SerialPort;
-use Symbol qw(gensym);
-use EBusFilterTest;
-use POE::Wheel::ReadWrite;
+use EBusFilter;
+use POE::Component::Client::TCP;
 
 POE::Session->create(
- inline_states => {
-    _start => \&setup_device,
-    dataIn => \&dataIn,
-    dataError => \&dataError,
- },
+	inline_states => {
+		_start    => sub { },
+		dataIn    => \&dataIn,
+		dataError => \&dataError,
+	},
 );
+
+POE::Component::Client::TCP->new(
+	Alias         => 'tcpClient',
+	RemoteAddress => "192.168.165.9",
+	RemotePort    => "10001",
+	Connected     => sub {
+		print "Connected\n";
+	},
+	ConnectError => sub {
+		print "Connection failed.\n";
+	},
+	ServerInput  => \&dataIn,
+	InlineStates => {
+		ServerOutput => sub {
+			my ( $kernel, $heap, $data ) = @_[ KERNEL, HEAP, ARG0 ];
+			$heap->{server}->put($data);
+		  }
+	},
+	Filter => EBusFilter->new(),
+);
+
 POE::Kernel->run();
 exit 0;
 
-sub setup_device {
-  my ($kernel, $heap) = @_[KERNEL, HEAP];
-  my $handle = gensym();
-  my $port = tie(*$handle, "Device::SerialPort", "/dev/ttyUSB0");
-  die "can't open port: $!" unless $port;
-  $port->datatype('raw');
-  $port->baudrate(2400);
-  $port->databits(8);
-  $port->parity("none");
-  $port->stopbits(1);
-  #$port->handshake("rts");
-  $port->write_settings();
-  
-  $heap->{port} = $port;
-  $heap->{port_wheel} = POE::Wheel::ReadWrite->new(
-    Handle => $handle,
-    Filter => EBusFilter->new(),
-    InputEvent => "dataIn",
-    ErrorEvent => "dataError",
-  );
-}
-
 sub dataIn {
-  my ( $kernel, $heap, $data ) = @_[ KERNEL, HEAP, ARG0 ];
-  print $data."\n";
-}
-
-sub dataError {
-  print "Fuck up\n";
+	my ( $kernel, $heap, $data ) = @_[ KERNEL, HEAP, ARG0 ];
+	print "QQ:" . $data->{QQ};
+	print " ZZ:" . $data->{ZZ};
+	print " PB:" . $data->{PB};
+	print " SB:" . $data->{SB};
+	print " NN:" . $data->{NN};
+	for ( my $i = 0 ; $i < $data->{NN} ; $i++ ) {
+		print " DA$i:" . $data->{DA}[$i];
+	}
+	print " CHK:" . $data->{CHK};
+	print " ACK:" . $data->{ACK};
+	if ( $data->{SNN} ) {
+		print " SNN:" . $data->{SNN};
+		for ( my $i = 0 ; $i < $data->{SNN} ; $i++ ) {
+			print " SDA$i:" . $data->{SDA}[$i];
+		}
+		print " SCHK:" . $data->{SCHK};
+	}
+	print " (!)"if ($data->{CHKSUMFALSE});
+	print " (!!)"if ($data->{SCHKSUMFALSE}); 
+	print "\n";
 }
