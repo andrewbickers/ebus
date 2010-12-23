@@ -2,13 +2,13 @@ package EBusFilter;
 
 use strict;
 use POE::Filter;
-use EBusCRC;
+use EBus;
 
 use vars qw($VERSION @ISA);
 $VERSION = '1.000';
 @ISA     = qw(POE::Filter);
 
-my $crc = new EBusCRC();
+my $crc = new EBus();
 
 my $buffer = "";
 
