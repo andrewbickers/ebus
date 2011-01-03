@@ -5,28 +5,44 @@ use POE;
 use EBusFilter;
 use EBus;
 use POE::Component::Client::TCP;
+use POE::Component::EasyDBI;
 
-my %names;
-$names{0x3}  = "Feuerungsautomat";
-$names{0xfe} = "Broadcast";
-$names{0x10} = "Heizungsregler";
-$names{0x30} = "Bedienmodul";
-$names{0x51} = "Bedienmodul";
-$names{0x70} = "Bedienmodul";
-$names{0xF1} = "Heizungsregler";
+my $debug = 0;
+
+my $ebus = EBus->new();
+
+# HAP specific
+my $moduleDbId = 269;
+my $config     = 132;
+my $insertLimit = 60; # DB-Inserts einschraenken. 
+my $time = time() - $insertLimit;
+
+# XPort
+my $remoteIP = "192.168.165.9";
+my $remotePort = "10001";
+
+# Database
+POE::Component::EasyDBI->new(
+	alias    => "database",
+	dsn      => "dbi:mysql:hap",
+	username => "hap",
+	password => "password",
+	options  => { autocommit => 1, },
+);
 
 POE::Session->create(
 	inline_states => {
-		_start    => sub { },
-		dataIn    => \&dataIn,
-		dataError => \&dataError,
+		_start         => sub { },
+		dataIn         => \&dataIn,
+		dataError      => \&dataError,
+		dbUpdateStatus => \&dbUpdateStatus,
 	},
 );
 
 POE::Component::Client::TCP->new(
 	Alias         => 'tcpClient',
-	RemoteAddress => "192.168.165.9",
-	RemotePort    => "10001",
+	RemoteAddress => $remoteIP,
+	RemotePort    => $remotePort,
 	Connected     => sub {
 		print "Connected\n";
 	},
@@ -48,10 +64,9 @@ exit 0;
 
 sub dataIn {
 	my ( $kernel, $heap, $data ) = @_[ KERNEL, HEAP, ARG0 ];
-	my $ebus = EBus->new();
 
 	# Sollwertuebertragung des Reglers an andere Regler
-	if ( $data->{PB} == 8 && $data->{SB} == 0 ) {
+	if ($debug && ( $data->{PB} == 8 && $data->{SB} == 0 )) {
 		print
 "# $data->{QQ} $data->{ZZ} ############## Sollwertuebertragung des Reglers an andere Regler ###################\n";
 		print "Kesselsoll:"
@@ -66,7 +81,7 @@ sub dataIn {
 	}
 
 	# Betriebsdaten des Reglers an den Feuerungsautomaten
-	elsif ( $data->{PB} == 5 && $data->{SB} == 7 ) {
+	elsif ($debug && ( $data->{PB} == 5 && $data->{SB} == 7 )) {
 		print
 "# $data->{QQ} $data->{ZZ} ############## Betriebsdaten des Reglers an den Feuerungsautomaten ###################\n";
 		print "Brenner abschalten\n"      if ( $data->{DA}[0] == 0x00 );
@@ -82,16 +97,88 @@ sub dataIn {
 	}
 
 	# Betriebsdaten des Feuerungsautomaten an den Regler - Block 1
-	elsif ( $data->{PB} == 5 && $data->{SB} == 3 && $data->{DA}[0] == 1 && $data->{QQ} == 3 && $data->{ZZ} == 254) {
-		print
-"# $data->{QQ} $data->{ZZ} ############## Betriebsdaten des Feuerungsautomaten an den Regler - Block 1  ###################\n";
-		print "Stellgrad Kesselleistung" . $data->{DA}[3] . "\n";
-		print "Kesseltemp." . $ebus->data1c( $data->{DA}[4] ) . "\n";
-		print "RŸcklauftemp.:" . $data->{DA}[5] . "\n";
-		print "Boilertemp.:" . $data->{DA}[6] . "\n";
-		print "Aussentemp.:" . $data->{DA}[7] . "\n";
+	elsif ((time() - $time >= $insertLimit) && ($data->{PB} == 5
+		&& $data->{SB} == 3
+		&& $data->{DA}[0] == 1
+		&& $data->{QQ} == 3
+		&& $data->{ZZ} == 254 ))
+	{
+                $time = time();
+                print time()."\n";
+		# Kessel
+		$kernel->post(
+			'database',
+			insert => {
+				sql =>
+'INSERT INTO status (TS, Type, Module, Address, Status, Config) VALUES (?,?,?,?,?,?)',
+				placeholders => [
+					time(), 40, $moduleDbId, 200,
+					$ebus->data1c( $data->{DA}[4] ), $config
+				],
+				event => '',
+			}
+		);
+
+		# Ruecklauf
+		$kernel->post(
+			'database',
+			insert => {
+				sql =>
+'INSERT INTO status (TS, Type, Module, Address, Status, Config) VALUES (?,?,?,?,?,?)',
+				placeholders =>
+				  [ time(), 40, $moduleDbId, 201, $data->{DA}[5], $config ],
+				event => '',
+			}
+		);
+
+		# Boiler
+		$kernel->post(
+			'database',
+			insert => {
+				sql =>
+'INSERT INTO status (TS, Type, Module, Address, Status, Config) VALUES (?,?,?,?,?,?)',
+				placeholders =>
+				  [ time(), 40, $moduleDbId, 202, $data->{DA}[6], $config ],
+				event => '',
+			}
+		);
+
+		# Aussen
+		$kernel->post(
+			'database',
+			insert => {
+				sql =>
+'INSERT INTO status (TS, Type, Module, Address, Status, Config) VALUES (?,?,?,?,?,?)',
+				placeholders =>
+				  [ time(), 40, $moduleDbId, 203, $data->{DA}[7], $config ],
+				event => '',
+			}
+		);
+
+		# Stellgrad
+		$kernel->post(
+			'database',
+			insert => {
+				sql =>
+'INSERT INTO status (TS, Type, Module, Address, Status, Config) VALUES (?,?,?,?,?,?)',
+				placeholders =>
+				  [ time(), 40, $moduleDbId, 204, $data->{DA}[3], $config ],
+				event => '',
+			}
+		);
+        # Flamme an/aus
+	$kernel->post(
+		'database',
+		insert => {
+			sql =>
+'INSERT INTO status (TS, Type, Module, Address, Status, Config) VALUES (?,?,?,?,?,?)',
+			placeholders =>
+			  [ time(), 40, $moduleDbId, 205, ($data->{DA}[2] & 8)*12.5, $config ],
+			event => '',
+		}
+	);
 	}
-	else {
+	elsif ($debug) {
 		print "QQ:" . $data->{QQ};
 		print " ZZ:" . $data->{ZZ};
 		print " PB:" . $data->{PB};
@@ -113,5 +200,4 @@ sub dataIn {
 		print " (!!)" if ( $data->{SCHKSUMFALSE} );
 		print "\n";
 	}
-
 }

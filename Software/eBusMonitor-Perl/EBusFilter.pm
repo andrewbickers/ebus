@@ -67,7 +67,7 @@ sub get_one_start {
 sub get_one {
 	my $self = shift;
 	my $len  = length( $self->{transfer} );
-	if ( $len > 5 ) {    # Minium: QQ ZZ PB SB NN
+	if ( $len > 7 ) {    # Minium: QQ ZZ PB SB NN DA0 CRC
 		my $dgram = {
 			QQ => asciiConv( substr( $self->{transfer}, 0, 1 ) ),
 			ZZ => asciiConv( substr( $self->{transfer}, 1, 1 ) ),
@@ -95,9 +95,12 @@ sub get_one {
 		if ( $check != $dgram->{CHK} ) {
 			$dgram->{CHKSUMFALSE} = 1;
 		}
+		if ( $len <= ( 5 + $dgram->{NN} ) ) {
+			$self->{transfer} = "";
+			return [$dgram];
+		}
 		$dgram->{ACK} =
 		  asciiConv( substr( $self->{transfer}, 6 + $dgram->{NN}, 1 ) );
-
 		if ( $len <= ( 6 + $dgram->{NN} ) ) {
 			$self->{transfer} = "";
 			return [$dgram];
