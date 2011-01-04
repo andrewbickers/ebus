@@ -110,7 +110,7 @@ sub get_one {
     if ( $len <= ( 6 + $dgram->{NN} ) ) {
       $self->{transfer} = "";
       return [$dgram];
-    }
+    } 
     $dgram->{SNN} =
       asciiConv( substr( $self->{transfer}, 7 + $dgram->{NN}, 1 ) );
       
