@@ -116,7 +116,13 @@ sub get_one {
     if ( $dgram->{SNN} ) {
       my @dataTmp1;
       for ( my $i = 0 ; $i < $dgram->{SNN} ; $i++ ) {
-        push @dataTmp1, asciiConv( substr( $self->{transfer}, $i + 8, 1 ) );
+        push @dataTmp1, asciiConv(
+          substr( $self->{transfer}, $i + 8, 1 )
+            or {
+            $self->{transfer} = "";
+              return [$dgram];
+            }
+        );
       }
       $dgram->{SDA}  = \@dataTmp1;
       $dgram->{SCHK} = asciiConv(
