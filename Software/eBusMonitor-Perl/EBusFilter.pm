@@ -113,6 +113,7 @@ sub get_one {
     }
     $dgram->{SNN} =
       asciiConv( substr( $self->{transfer}, 7 + $dgram->{NN}, 1 ) );
+      
     if ( $dgram->{SNN} ) {
       my @dataTmp1;
       for ( my $i = 0 ; $i < $dgram->{SNN} ; $i++ ) {
