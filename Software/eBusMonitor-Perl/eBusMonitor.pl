@@ -67,7 +67,7 @@ POE::Component::Client::TCP->new(
 
 sub tcpReconnect {
   my ( $kernel, $heap ) = @_[ KERNEL, HEAP ];
-  print "Connection to $remoteIp:$remotePort lost. Trying reconnect...\n";
+  print "Connection to $remoteIP:$remotePort lost. Trying reconnect...\n";
   $kernel->delay( reconnect => 2 );
 }
 
