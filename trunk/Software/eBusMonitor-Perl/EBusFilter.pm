@@ -67,7 +67,6 @@ sub get_one_start {
 sub get_one {
   my $self = shift;
   my $len  = length( $self->{transfer} );
-  eval {
     if ( $len > 7 )
     {    # Minium: QQ ZZ PB SB NN DA0 CRC
       my $dgram = {
@@ -78,14 +77,9 @@ sub get_one {
         NN => asciiConv( substr( $self->{transfer}, 4, 1 ) ),
       };
       my @dataTmp;
+      eval {
       for ( my $i = 0 ; $i < $dgram->{NN} ; $i++ ) {
-        push @dataTmp, asciiConv(
-          substr( $self->{transfer}, $i + 5, 1 )
-            or {
-            $self->{transfer} = "";
-              return [$dgram];
-            }
-        );
+        push @dataTmp, asciiConv(substr( $self->{transfer}, $i + 5, 1 ));
       }
       $dgram->{DA} = \@dataTmp;
 
@@ -119,13 +113,7 @@ sub get_one {
       if ( $dgram->{SNN} ) {
         my @dataTmp1;
         for ( my $i = 0 ; $i < $dgram->{SNN} ; $i++ ) {
-          push @dataTmp1, asciiConv(
-            substr( $self->{transfer}, $i + 8, 1 )
-              or {
-              $self->{transfer} = "";
-                return [$dgram];
-              }
-          );
+          push @dataTmp1, asciiConv(substr( $self->{transfer}, $i + 8, 1 ));
         }
         $dgram->{SDA}  = \@dataTmp1;
         $dgram->{SCHK} = asciiConv(
@@ -137,8 +125,12 @@ sub get_one {
         }
       }
       $self->{transfer} = "";
+      };
+      if ($@) {
+         print "Substring outside ... bogus packet\n";
+         return [];
+      }
       return [$dgram];
-    }
     }
     return [];
 }
