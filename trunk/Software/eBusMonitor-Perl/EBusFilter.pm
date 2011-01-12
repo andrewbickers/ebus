@@ -67,77 +67,80 @@ sub get_one_start {
 sub get_one {
   my $self = shift;
   my $len  = length( $self->{transfer} );
-  if ( $len > 7 ) {    # Minium: QQ ZZ PB SB NN DA0 CRC
-    my $dgram = {
-      QQ => asciiConv( substr( $self->{transfer}, 0, 1 ) ),
-      ZZ => asciiConv( substr( $self->{transfer}, 1, 1 ) ),
-      PB => asciiConv( substr( $self->{transfer}, 2, 1 ) ),
-      SB => asciiConv( substr( $self->{transfer}, 3, 1 ) ),
-      NN => asciiConv( substr( $self->{transfer}, 4, 1 ) ),
-    };
-    my @dataTmp;
-    for ( my $i = 0 ; $i < $dgram->{NN} ; $i++ ) {
-      push @dataTmp, asciiConv(
-        substr( $self->{transfer}, $i + 5, 1 )
-          or {
-          $self->{transfer} = "";
-            return [$dgram];
-          }
-      );
-    }
-    $dgram->{DA} = \@dataTmp;
-
-    #debug
-    #for ( my $i = 0 ; $i < $len ; $i++ ) {
-    #    print decToHex( asciiConv( substr( $self->{transfer}, $i, 1 ) ) )
-    #      . " ";
-    #}
-    #print "\n";
-
-    $dgram->{CHK} =
-      asciiConv( substr( $self->{transfer}, 5 + $dgram->{NN}, 1 ) );
-    my $check =
-      $crc->calcCrcExpanded( substr( $self->{transfer}, 0, 5 + $dgram->{NN} ) );
-    if ( $check != $dgram->{CHK} ) {
-      $dgram->{CHKSUMFALSE} = 1;
-    }
-    if ( $len <= ( 5 + $dgram->{NN} ) ) {
-      $self->{transfer} = "";
-      return [$dgram];
-    }
-    $dgram->{ACK} =
-      asciiConv( substr( $self->{transfer}, 6 + $dgram->{NN}, 1 ) );
-    if ( $len <= ( 6 + $dgram->{NN} ) ) {
-      $self->{transfer} = "";
-      return [$dgram];
-    } 
-    $dgram->{SNN} =
-      asciiConv( substr( $self->{transfer}, 7 + $dgram->{NN}, 1 ) );
-      
-    if ( $dgram->{SNN} ) {
-      my @dataTmp1;
-      for ( my $i = 0 ; $i < $dgram->{SNN} ; $i++ ) {
-        push @dataTmp1, asciiConv(
-          substr( $self->{transfer}, $i + 8, 1 )
+  eval {
+    if ( $len > 7 )
+    {    # Minium: QQ ZZ PB SB NN DA0 CRC
+      my $dgram = {
+        QQ => asciiConv( substr( $self->{transfer}, 0, 1 ) ),
+        ZZ => asciiConv( substr( $self->{transfer}, 1, 1 ) ),
+        PB => asciiConv( substr( $self->{transfer}, 2, 1 ) ),
+        SB => asciiConv( substr( $self->{transfer}, 3, 1 ) ),
+        NN => asciiConv( substr( $self->{transfer}, 4, 1 ) ),
+      };
+      my @dataTmp;
+      for ( my $i = 0 ; $i < $dgram->{NN} ; $i++ ) {
+        push @dataTmp, asciiConv(
+          substr( $self->{transfer}, $i + 5, 1 )
             or {
             $self->{transfer} = "";
               return [$dgram];
             }
         );
       }
-      $dgram->{SDA}  = \@dataTmp1;
-      $dgram->{SCHK} = asciiConv(
-        substr( $self->{transfer}, 8 + $dgram->{SNN} + $dgram->{NN}, 1 ) );
-      my $checkS = $crc->calcCrcExpanded(
-        substr( $self->{transfer}, 7 + $dgram->{NN}, $dgram->{SNN} + 1 ) );
-      if ( $checkS != $dgram->{SCHK} ) {
-        $dgram->{SCHKSUMFALSE} = 1;
+      $dgram->{DA} = \@dataTmp;
+
+      #debug
+      #for ( my $i = 0 ; $i < $len ; $i++ ) {
+      #    print decToHex( asciiConv( substr( $self->{transfer}, $i, 1 ) ) )
+      #      . " ";
+      #}
+      #print "\n";
+
+      $dgram->{CHK} =
+        asciiConv( substr( $self->{transfer}, 5 + $dgram->{NN}, 1 ) );
+      my $check = $crc->calcCrcExpanded(
+        substr( $self->{transfer}, 0, 5 + $dgram->{NN} ) );
+      if ( $check != $dgram->{CHK} ) {
+        $dgram->{CHKSUMFALSE} = 1;
       }
+      if ( $len <= ( 5 + $dgram->{NN} ) ) {
+        $self->{transfer} = "";
+        return [$dgram];
+      }
+      $dgram->{ACK} =
+        asciiConv( substr( $self->{transfer}, 6 + $dgram->{NN}, 1 ) );
+      if ( $len <= ( 6 + $dgram->{NN} ) ) {
+        $self->{transfer} = "";
+        return [$dgram];
+      }
+      $dgram->{SNN} =
+        asciiConv( substr( $self->{transfer}, 7 + $dgram->{NN}, 1 ) );
+
+      if ( $dgram->{SNN} ) {
+        my @dataTmp1;
+        for ( my $i = 0 ; $i < $dgram->{SNN} ; $i++ ) {
+          push @dataTmp1, asciiConv(
+            substr( $self->{transfer}, $i + 8, 1 )
+              or {
+              $self->{transfer} = "";
+                return [$dgram];
+              }
+          );
+        }
+        $dgram->{SDA}  = \@dataTmp1;
+        $dgram->{SCHK} = asciiConv(
+          substr( $self->{transfer}, 8 + $dgram->{SNN} + $dgram->{NN}, 1 ) );
+        my $checkS = $crc->calcCrcExpanded(
+          substr( $self->{transfer}, 7 + $dgram->{NN}, $dgram->{SNN} + 1 ) );
+        if ( $checkS != $dgram->{SCHK} ) {
+          $dgram->{SCHKSUMFALSE} = 1;
+        }
+      }
+      $self->{transfer} = "";
+      return [$dgram];
     }
-    $self->{transfer} = "";
-    return [$dgram];
-  }
-  return [];
+    }
+    return [];
 }
 
 sub put {
